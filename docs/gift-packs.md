@@ -302,11 +302,3 @@ Import Pack → Upload a pack**; the panel runs a dry-run first (parses the
 manifest, resolves and validates every animation) and shows you exactly what
 the pack contains before you confirm. It then appears on the shelf, where
 *Preview* and the import actions live.
-
-## Licensing
-
-Pack assets must be your own work, or something you have the rights to
-distribute. Do not repackage Telegram's own official gift animations or
-other copyrighted material -- they're a useful reference for understanding
-the *format* (how a gift's model/pattern/backdrop pool is put together,
-what rlottie can and can't render), never something to ship in a pack.
