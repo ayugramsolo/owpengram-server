@@ -93,6 +93,7 @@ const (
 	ActionTransferCollectibleUsername = "usernames.collectible.transfer"
 	ActionRevokeCollectibleUsername   = "usernames.collectible.revoke"
 	ActionDeleteCollectibleUsername   = "usernames.collectible.delete"
+	ActionTransferStarGift            = "stargifts.transfer"
 	// Official platform verification review. Claim/approve/reject act on one
 	// application; revoke acts on a target, because clearing a badge is not a
 	// decision on the application that granted it.
@@ -498,6 +499,11 @@ type StarGiftCatalogService interface {
 	// of charge -- the admin "give gift" action, independent of the Stars
 	// purchase path.
 	GrantUnique(ctx context.Context, req domain.AdminStarGiftGrant) (domain.AdminStarGiftGrantResult, error)
+	// AdminTransferStarGift force-transfers an existing unique star gift to a
+	// new owner, bypassing the normal client-initiated transfer flow. Used
+	// by operator tooling (e.g. escrow payouts) that cannot act through a
+	// user's own MTProto session.
+	AdminTransferStarGift(ctx context.Context, slug string, to domain.Peer) (domain.StarGiftTransferResult, error)
 }
 
 // StorageService is the admin-console surface over manual storage purge --
@@ -2712,6 +2718,40 @@ func (s *Service) TransferCollectibleUsername(ctx context.Context, req TransferC
 			message = "collectible username transfer was a no-op"
 		}
 		return CommandResult{Message: message, Details: details}, nil
+	})
+}
+
+type TransferStarGiftRequest struct {
+	CommandMeta
+	Slug        string `json:"slug"`
+	ToUserID    int64  `json:"to_user_id,string,omitempty"`
+	ToChannelID int64  `json:"to_channel_id,string,omitempty"`
+}
+
+func (s *Service) TransferStarGift(ctx context.Context, req TransferStarGiftRequest) (CommandResult, error) {
+	if s == nil || s.starGifts == nil {
+		return CommandResult{}, fmt.Errorf("admin star gift dependency is not configured")
+	}
+	slug := strings.TrimSpace(req.Slug)
+	if slug == "" {
+		return CommandResult{}, fmt.Errorf("slug is required")
+	}
+	to, err := collectibleOwnerPeer(req.ToUserID, req.ToChannelID)
+	if err != nil {
+		return CommandResult{}, err
+	}
+	if to.Type == "" {
+		return CommandResult{}, fmt.Errorf("exactly one of to_user_id or to_channel_id is required")
+	}
+	return s.runCommand(ctx, req.CommandMeta, ActionTransferStarGift, req.ToUserID, to, req, func() (CommandResult, error) {
+		details := map[string]any{"slug": slug, "to_type": string(to.Type), "to_id": strconv.FormatInt(to.ID, 10)}
+		result, err := s.starGifts.AdminTransferStarGift(ctx, slug, to)
+		if err != nil {
+			return CommandResult{Details: details}, err
+		}
+		details["previous_owner_type"] = string(result.Unique.Owner.Type)
+		details["previous_owner_id"] = strconv.FormatInt(result.Unique.Owner.ID, 10)
+		return CommandResult{Details: details}, nil
 	})
 }
 
