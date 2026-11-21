@@ -1,7 +1,0 @@
---- a/cmd/telesrv-admin/server.go
-+++ b/cmd/telesrv-admin/server.go
-@@ -173,6 +173,7 @@ func (s *server) routes() http.Handler {
- 	mux.Handle("POST /api/actions/publish-star-gift-collectibles", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handlePublishStarGiftCollectiblesAPI)))
- 	mux.Handle("POST /api/actions/give-star-gift", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleGiveStarGiftAPI)))
-+	mux.Handle("POST /api/actions/transfer-star-gift", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleTransferStarGiftAPI)))
- 	mux.Handle("POST /api/actions/upload-gift-pack", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleUploadGiftPackAPI)))
