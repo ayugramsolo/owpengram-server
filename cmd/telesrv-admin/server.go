@@ -197,6 +197,7 @@ func (s *server) routes() http.Handler {
 	mux.Handle("POST /api/actions/set-star-gift-catalog-sort-order", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleSetStarGiftCatalogSortOrderAPI)))
 	mux.Handle("POST /api/actions/publish-star-gift-collectibles", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handlePublishStarGiftCollectiblesAPI)))
 	mux.Handle("POST /api/actions/give-star-gift", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleGiveStarGiftAPI)))
+	mux.Handle("POST /api/actions/transfer-star-gift", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleTransferStarGiftAPI)))
 	mux.Handle("POST /api/actions/upload-gift-pack", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleUploadGiftPackAPI)))
 	mux.Handle("POST /api/actions/delete-gift-pack", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleDeleteGiftPackAPI)))
 	mux.Handle("POST /api/actions/import-gift-pack", s.scopedRoute(permissionStarGiftsManage, http.HandlerFunc(s.handleImportGiftPackAPI)))
@@ -2613,6 +2614,32 @@ func (s *server) handleTransferCollectibleUsernameAPI(w http.ResponseWriter, r *
 		ToChannelID: body.ToChannelID.Int64(),
 	}
 	result, err := s.callAdminAPI(r.Context(), "/v1/collectible-usernames/transfer", req)
+	writeCommandResultAPI(w, result, err)
+}
+
+type transferStarGiftAPIRequest struct {
+	CommandID   string    `json:"command_id"`
+	Reason      string    `json:"reason"`
+	Confirm     bool      `json:"confirm"`
+	Slug        string    `json:"slug"`
+	ToUserID    flexInt64 `json:"to_user_id"`
+	ToChannelID flexInt64 `json:"to_channel_id"`
+}
+
+// handleTransferStarGiftAPI forwards an admin-forced star-gift transfer to
+// the real telesrv admin API, mirroring handleTransferCollectibleUsernameAPI.
+func (s *server) handleTransferStarGiftAPI(w http.ResponseWriter, r *http.Request) {
+	var body transferStarGiftAPIRequest
+	if !decodeAction(w, r, &body) {
+		return
+	}
+	req := admin.TransferStarGiftRequest{
+		CommandMeta: s.commandMetaFromAPI(r, body.CommandID, body.Reason, body.Confirm, "transfer-star-gift"),
+		Slug:        body.Slug,
+		ToUserID:    body.ToUserID.Int64(),
+		ToChannelID: body.ToChannelID.Int64(),
+	}
+	result, err := s.callAdminAPI(r.Context(), "/v1/star-gift-catalog/transfer", req)
 	writeCommandResultAPI(w, result, err)
 }
 

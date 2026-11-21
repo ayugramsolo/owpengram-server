@@ -123,6 +123,7 @@ type Service interface {
 	ReviewModerationAppeal(ctx context.Context, request domain.ModerationDecisionRequest) (domain.ModerationCaseDetail, bool, error)
 	MintCollectibleUsername(ctx context.Context, req admin.MintCollectibleUsernameRequest) (admin.CommandResult, error)
 	TransferCollectibleUsername(ctx context.Context, req admin.TransferCollectibleUsernameRequest) (admin.CommandResult, error)
+	TransferStarGift(ctx context.Context, req admin.TransferStarGiftRequest) (admin.CommandResult, error)
 	RevokeCollectibleUsername(ctx context.Context, req admin.RevokeCollectibleUsernameRequest) (admin.CommandResult, error)
 	DeleteCollectibleUsername(ctx context.Context, req admin.DeleteCollectibleUsernameRequest) (admin.CommandResult, error)
 	CollectibleUsernames(ctx context.Context, filter domain.CollectibleUsernameFilter) ([]domain.CollectibleUsername, error)
@@ -279,6 +280,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /v1/star-gift-catalog/{gift_id}/collectibles/{kind}/{attribute_id}/animation", s.authenticated(s.handleStarGiftCollectibleAnimation))
 	mux.HandleFunc("POST /v1/star-gift-catalog/publish-collectibles", s.authenticated(s.handlePublishStarGiftCollectibles))
 	mux.HandleFunc("POST /v1/star-gift-catalog/give", s.authenticated(s.handleGiveStarGift))
+	mux.HandleFunc("POST /v1/star-gift-catalog/transfer", s.authenticated(s.handleTransferStarGift))
 	mux.HandleFunc("POST /v1/gift-packs/upload", s.authenticated(s.handleUploadGiftPack))
 	mux.HandleFunc("POST /v1/gift-packs/delete", s.authenticated(s.handleDeleteGiftPack))
 	mux.HandleFunc("GET /v1/gift-packs", s.authenticated(s.handleGiftPacks))
@@ -1395,6 +1397,19 @@ func (s *Server) handleGiveStarGift(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := s.svc.GiveStarGift(r.Context(), req)
+	writeCommandResult(w, result, err)
+}
+
+// handleTransferStarGift forces a star gift to change owner outside the
+// usual "only the current owner may transfer" rule -- an admin/escrow-only
+// capability (see internal/admin/service.go's AdminTransferStarGift/TransferStarGift),
+// mirroring handleTransferCollectibleUsername.
+func (s *Server) handleTransferStarGift(w http.ResponseWriter, r *http.Request) {
+	var req admin.TransferStarGiftRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.svc.TransferStarGift(r.Context(), req)
 	writeCommandResult(w, result, err)
 }
 
