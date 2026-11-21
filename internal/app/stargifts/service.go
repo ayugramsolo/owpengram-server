@@ -687,6 +687,26 @@ func (s *Service) Transfer(ctx context.Context, req domain.StarGiftTransferReque
 	return s.lifecycle.TransferStarGift(ctx, req)
 }
 
+func (s *Service) AdminTransferStarGift(ctx context.Context, slug string, to domain.Peer) (domain.StarGiftTransferResult, error) {
+	if s == nil || s.lifecycle == nil {
+		return domain.StarGiftTransferResult{}, domain.ErrStarGiftTransferUnavailable
+	}
+	unique, found, err := s.UniqueBySlug(ctx, slug)
+	if err != nil {
+		return domain.StarGiftTransferResult{}, err
+	}
+	if !found {
+		return domain.StarGiftTransferResult{}, domain.ErrStarGiftTransferUnavailable
+	}
+	return s.Transfer(ctx, domain.StarGiftTransferRequest{
+		ActorUserID: unique.Owner.ID,
+		Ref:         domain.SavedStarGiftRef{Owner: unique.Owner, Slug: slug},
+		To:          to,
+		CommandKey:  fmt.Sprintf("admin-force:%s:%s:%d", slug, string(to.Type), to.ID),
+		Date:        int(time.Now().Unix()),
+	})
+}
+
 func (s *Service) PurchaseResale(ctx context.Context, req domain.StarGiftResalePurchaseRequest) (domain.StarGiftTransferResult, error) {
 	if s == nil || s.lifecycle == nil {
 		return domain.StarGiftTransferResult{}, domain.ErrStarGiftResaleUnavailable
