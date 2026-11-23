@@ -1296,6 +1296,19 @@ func ensureNoStarGiftMarketConflict(ctx context.Context, tx pgx.Tx, uniqueID int
 	return nil
 }
 
+// HasMarketConflict is the same listing/pending-offer check as
+// ensureNoStarGiftMarketConflict, exposed through the store interface (not
+// inside a transaction) so a caller can check upfront before attempting a
+// transfer, instead of only learning about the conflict from a failed one.
+func (s *StarGiftLifecycleStore) HasMarketConflict(ctx context.Context, uniqueGiftID int64) (bool, error) {
+	var listing, offers bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM star_gift_listings WHERE unique_gift_id=$1),
+	 EXISTS(SELECT 1 FROM star_gift_offers WHERE unique_gift_id=$1 AND status='pending')`, uniqueGiftID).Scan(&listing, &offers); err != nil {
+		return false, err
+	}
+	return listing || offers, nil
+}
+
 func transferUniqueAction(unique domain.UniqueStarGift, fromUserID int64, to domain.Peer, saved domain.SavedStarGift) *domain.MessageStarGiftUniqueAction {
 	peer := to
 	savedID := saved.SavedID

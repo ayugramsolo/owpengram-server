@@ -698,6 +698,15 @@ func (s *Service) AdminTransferStarGift(ctx context.Context, slug string, to dom
 	if !found {
 		return domain.StarGiftTransferResult{}, domain.ErrStarGiftTransferUnavailable
 	}
+	// Check the market conflict upfront so a blocked transfer comes back with a
+	// clear reason naming the slug, instead of the generic error Transfer itself
+	// returns once it is already inside the command/transaction machinery.
+	if conflict, err := s.HasMarketConflict(ctx, unique.ID); err != nil {
+		return domain.StarGiftTransferResult{}, err
+	} else if conflict {
+		return domain.StarGiftTransferResult{}, fmt.Errorf(
+			"star gift %q is listed for sale or has a pending offer: %w", slug, domain.ErrStarGiftTransferUnavailable)
+	}
 	return s.Transfer(ctx, domain.StarGiftTransferRequest{
 		ActorUserID: unique.Owner.ID,
 		Ref:         domain.SavedStarGiftRef{Owner: unique.Owner, Slug: slug},
@@ -705,6 +714,17 @@ func (s *Service) AdminTransferStarGift(ctx context.Context, slug string, to dom
 		CommandKey:  fmt.Sprintf("admin-force:%s:%s:%d", slug, string(to.Type), to.ID),
 		Date:        int(time.Now().Unix()),
 	})
+}
+
+// HasMarketConflict reports whether a unique star gift currently has an active
+// resale listing or a pending offer. Exposed for callers that need to check
+// before attempting a transfer -- an admin tool, or a future escrow/stake flow
+// that must not accept a gift it cannot later pay out.
+func (s *Service) HasMarketConflict(ctx context.Context, uniqueGiftID int64) (bool, error) {
+	if s == nil || s.lifecycle == nil {
+		return false, domain.ErrStarGiftTransferUnavailable
+	}
+	return s.lifecycle.HasMarketConflict(ctx, uniqueGiftID)
 }
 
 func (s *Service) PurchaseResale(ctx context.Context, req domain.StarGiftResalePurchaseRequest) (domain.StarGiftTransferResult, error) {

@@ -121,4 +121,10 @@ type StarGiftLifecycleStore interface {
 	// SweepStarGiftLifecycle advances time-driven offer/auction aggregates and
 	// drains their durable notification/delivery outboxes in bounded batches.
 	SweepStarGiftLifecycle(ctx context.Context, now, limit int) error
+	// HasMarketConflict reports whether a unique star gift currently has an
+	// active resale listing or a pending offer -- the same check TransferStarGift
+	// enforces internally, exposed here so a caller (an admin tool, or a future
+	// escrow/stake flow) can check upfront instead of discovering the conflict
+	// only when the transfer itself fails.
+	HasMarketConflict(ctx context.Context, uniqueGiftID int64) (bool, error)
 }
