@@ -1286,6 +1286,14 @@ func (s *Service) SignUp(ctx context.Context, auth domain.Authorization, phone, 
 	if systemLoginPhoneForbidden(phone) {
 		return domain.User{}, domain.Message{}, ErrSystemUserLoginForbidden
 	}
+	if s.auths != nil {
+		fp := domain.DeviceFingerprint(auth)
+		if banned, err := s.auths.IsDeviceBanned(ctx, fp); err != nil {
+			return domain.User{}, domain.Message{}, err
+		} else if banned {
+			return domain.User{}, domain.Message{}, domain.ErrDeviceBanned
+		}
+	}
 	firstName = strings.TrimSpace(firstName)
 	lastName = strings.TrimSpace(lastName)
 	if firstName == "" || utf8.RuneCountInString(firstName) > 64 || utf8.RuneCountInString(lastName) > 64 {
@@ -1600,6 +1608,32 @@ func (s *Service) ListAuthorizations(ctx context.Context, userID int64) ([]domai
 		return nil, nil
 	}
 	return s.auths.ListByUser(ctx, userID)
+}
+
+// BanUserDevices bans every distinct device fingerprint seen among userID's
+// past and current authorizations (see domain.DeviceFingerprint), so that if
+// this account signs up again from one of the same devices, SignUp rejects
+// it. Returns how many distinct fingerprints were banned.
+func (s *Service) BanUserDevices(ctx context.Context, userID int64, reason, actor string) (int, error) {
+	if s == nil || s.auths == nil || userID == 0 {
+		return 0, fmt.Errorf("auth dependency is not configured")
+	}
+	list, err := s.auths.ListByUser(ctx, userID)
+	if err != nil {
+		return 0, err
+	}
+	seen := make(map[string]bool, len(list))
+	for _, a := range list {
+		fp := domain.DeviceFingerprint(a)
+		if seen[fp] {
+			continue
+		}
+		seen[fp] = true
+		if err := s.auths.BanDevice(ctx, fp, userID, reason, actor); err != nil {
+			return len(seen) - 1, err
+		}
+	}
+	return len(seen), nil
 }
 
 func (s *Service) ResetAuthorization(ctx context.Context, userID, hash int64) (domain.Authorization, bool, error) {

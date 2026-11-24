@@ -462,6 +462,8 @@ func signInErr(err error) error {
 		return firstNameInvalidErr()
 	case errors.Is(err, domain.ErrSessionPasswordNeeded):
 		return sessionPasswordNeededErr()
+	case errors.Is(err, domain.ErrDeviceBanned):
+		return tgerr.New(400, "PHONE_NUMBER_BANNED")
 	default:
 		return internalErr()
 	}
