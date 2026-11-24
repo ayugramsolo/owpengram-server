@@ -22,6 +22,14 @@ type AuthorizationStore interface {
 	// MarkPasswordPassed 仅在 auth_key 仍属于 expectedUserID 且仍为
 	// password_pending 时提升为完全授权，避免旧用户的密码 proof 提升重绑后的账号。
 	MarkPasswordPassed(ctx context.Context, authKeyID [8]byte, expectedUserID int64) error
+	// IsDeviceBanned reports whether domain.DeviceFingerprint(fingerprint) has
+	// been banned by an admin (see BanDevice).
+	IsDeviceBanned(ctx context.Context, fingerprint string) (bool, error)
+	// BanDevice records a device fingerprint as banned. bannedUserID is the
+	// account the ban originated from (for audit purposes); actor identifies
+	// who issued the ban. Idempotent: banning an already-banned fingerprint
+	// again just updates reason/actor, it does not error.
+	BanDevice(ctx context.Context, fingerprint string, bannedUserID int64, reason, actor string) error
 }
 
 // AuthKeyAuthorityLinker is an optional in-process store-composition boundary.

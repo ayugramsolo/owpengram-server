@@ -289,10 +289,11 @@ func (s *TempAuthKeyBindingStore) DeleteExpired(_ context.Context, expiredBefore
 
 // AuthorizationStore 是 store.AuthorizationStore 的内存实现。
 type AuthorizationStore struct {
-	linkMu   sync.RWMutex
-	authKeys *authKeyState
-	mu       sync.RWMutex
-	m        map[[8]byte]domain.Authorization
+	linkMu     sync.RWMutex
+	authKeys   *authKeyState
+	mu         sync.RWMutex
+	m          map[[8]byte]domain.Authorization
+	deviceBans map[string]bool
 }
 
 // NewAuthorizationStore 创建内存 AuthorizationStore。
@@ -439,6 +440,26 @@ func mergeAuthorizationClientInfo(a *domain.Authorization, info domain.AuthKeyCl
 		a.IP = info.IP
 	}
 	a.ActiveAt = time.Now()
+}
+
+func (s *AuthorizationStore) IsDeviceBanned(_ context.Context, fingerprint string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deviceBans == nil {
+		return false, nil
+	}
+	_, ok := s.deviceBans[fingerprint]
+	return ok, nil
+}
+
+func (s *AuthorizationStore) BanDevice(_ context.Context, fingerprint string, bannedUserID int64, reason, actor string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.deviceBans == nil {
+		s.deviceBans = make(map[string]bool)
+	}
+	s.deviceBans[fingerprint] = true
+	return nil
 }
 
 func (s *AuthorizationStore) MarkPasswordPassed(_ context.Context, id [8]byte, expectedUserID int64) error {

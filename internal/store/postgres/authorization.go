@@ -229,6 +229,20 @@ WHERE auth_key_id = $1`,
 // MarkPasswordPassed atomically promotes only the pending identity whose
 // password was just verified. A concurrent cross-user Bind must not let A's
 // proof clear B's password_pending flag.
+func (s *AuthorizationStore) IsDeviceBanned(ctx context.Context, fingerprint string) (bool, error) {
+	var banned bool
+	err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM device_bans WHERE fingerprint=$1)`, fingerprint).Scan(&banned)
+	return banned, err
+}
+
+func (s *AuthorizationStore) BanDevice(ctx context.Context, fingerprint string, bannedUserID int64, reason, actor string) error {
+	_, err := s.db.Exec(ctx, `INSERT INTO device_bans(fingerprint, banned_user_id, reason, actor)
+VALUES ($1,$2,$3,$4)
+ON CONFLICT (fingerprint) DO UPDATE SET banned_user_id=$2, reason=$3, actor=$4, created_at=now()`,
+		fingerprint, bannedUserID, reason, actor)
+	return err
+}
+
 func (s *AuthorizationStore) MarkPasswordPassed(ctx context.Context, id [8]byte, expectedUserID int64) error {
 	tag, err := s.db.Exec(ctx, `
 	UPDATE authorizations SET password_pending = false, created_at = now(), active_at = now()

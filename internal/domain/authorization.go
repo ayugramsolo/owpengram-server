@@ -1,6 +1,33 @@
 package domain
 
-import "time"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"strconv"
+	"strings"
+	"time"
+)
+
+// ErrDeviceBanned is returned by SignUp when the signing-up client's device
+// fingerprint (see DeviceFingerprint) matches one an admin has banned --
+// typically because its previous account was banned and this is a fresh
+// account on the same physical device.
+var ErrDeviceBanned = errors.New("device is banned")
+
+// DeviceFingerprint derives a stable identity for the physical device behind
+// an Authorization, from the client metadata it reports at handshake time
+// (DeviceModel, SystemVersion, Platform, APIID). IP is deliberately excluded:
+// it changes too often (mobile networks, VPNs) to identify a device, and
+// would false-positive everyone sharing a network (same office, same NAT).
+func DeviceFingerprint(a Authorization) string {
+	raw := strings.ToLower(strings.TrimSpace(a.DeviceModel)) + "|" +
+		strings.ToLower(strings.TrimSpace(a.SystemVersion)) + "|" +
+		strings.ToLower(strings.TrimSpace(a.Platform)) + "|" +
+		strconv.Itoa(a.APIID)
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
 
 // Authorization 是一条设备授权：auth_key 与 user 的绑定 + initConnection 设备信息。
 // auth_key 是协议产物、授权是业务产物，故独立于 store.AuthKeyData。
