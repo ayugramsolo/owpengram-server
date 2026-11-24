@@ -177,6 +177,7 @@ func (s *server) routes() http.Handler {
 	mux.Handle("POST /api/actions/export-bot-token", s.scopedRoute(permissionBotTokenRead, http.HandlerFunc(s.handleExportBotTokenAPI)))
 	mux.Handle("POST /api/actions/set-channel-verified", s.scopedRoute(permissionVerificationReview, http.HandlerFunc(s.handleSetChannelVerifiedAPI)))
 	mux.Handle("POST /api/actions/revoke-sessions", s.scopedRoute(permissionAccountsManage, http.HandlerFunc(s.handleRevokeSessionsAPI)))
+	mux.Handle("POST /api/actions/ban-device", s.scopedRoute(permissionAccountsManage, http.HandlerFunc(s.handleBanDeviceAPI)))
 	mux.Handle("POST /api/actions/delete-messages", s.scopedRoute(permissionMessagesManage, http.HandlerFunc(s.handleDeleteMessagesAPI)))
 	mux.Handle("POST /api/actions/delete-history", s.scopedRoute(permissionMessagesManage, http.HandlerFunc(s.handleDeleteHistoryAPI)))
 	mux.Handle("GET /api/stickers", s.scopedRoute(permissionContentRead, http.HandlerFunc(s.handleStickerSetsAPI)))
@@ -1906,6 +1907,27 @@ func (s *server) handleRevokeSessionsAPI(w http.ResponseWriter, r *http.Request)
 		RevokeAll:   body.RevokeAll,
 	}
 	result, err := s.callAdminAPI(r.Context(), "/v1/accounts/revoke-sessions", req)
+	writeCommandResultAPI(w, result, err)
+}
+
+type banDeviceAPIRequest struct {
+	CommandID string    `json:"command_id"`
+	Reason    string    `json:"reason"`
+	Confirm   bool      `json:"confirm"`
+	UserID    flexInt64 `json:"user_id"`
+}
+
+func (s *server) handleBanDeviceAPI(w http.ResponseWriter, r *http.Request) {
+	var body banDeviceAPIRequest
+	if !decodeAction(w, r, &body) {
+		return
+	}
+	req := admin.BanDeviceRequest{
+		CommandMeta: s.commandMetaFromAPI(r, body.CommandID, body.Reason, body.Confirm, "ban-device"),
+		UserID:      body.UserID.Int64(),
+		Reason:      body.Reason,
+	}
+	result, err := s.callAdminAPI(r.Context(), "/v1/accounts/ban-device", req)
 	writeCommandResultAPI(w, result, err)
 }
 

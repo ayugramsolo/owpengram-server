@@ -79,6 +79,7 @@ type Service interface {
 	SetChannelColor(ctx context.Context, req admin.SetChannelColorRequest) (admin.CommandResult, error)
 	SetChannelEmojiStatus(ctx context.Context, req admin.SetChannelEmojiStatusRequest) (admin.CommandResult, error)
 	RevokeSessions(ctx context.Context, req admin.RevokeSessionsRequest) (admin.CommandResult, error)
+	BanDevice(ctx context.Context, req admin.BanDeviceRequest) (admin.CommandResult, error)
 	DeletePrivateMessages(ctx context.Context, req admin.DeletePrivateMessagesRequest) (admin.CommandResult, error)
 	DeletePrivateHistory(ctx context.Context, req admin.DeletePrivateHistoryRequest) (admin.CommandResult, error)
 	SetStickerSetArchived(ctx context.Context, req admin.SetStickerSetArchivedRequest) (admin.CommandResult, error)
@@ -239,6 +240,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /v1/accounts/set-color", s.authenticated(s.handleSetUserColor))
 	mux.HandleFunc("POST /v1/accounts/set-emoji-status", s.authenticated(s.handleSetUserEmojiStatus))
 	mux.HandleFunc("POST /v1/accounts/revoke-sessions", s.authenticated(s.handleRevokeSessions))
+	mux.HandleFunc("POST /v1/accounts/ban-device", s.authenticated(s.handleBanDevice))
 	mux.HandleFunc("GET /v1/channels/{id}/avatar", s.authenticated(s.handleChannelAvatar))
 	mux.HandleFunc("POST /v1/channels/set-avatar", s.authenticated(s.handleSetChannelAvatar))
 	mux.HandleFunc("POST /v1/channels/set-verified", s.authenticated(s.handleSetChannelVerified))
@@ -769,6 +771,15 @@ func (s *Server) handleRevokeSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := s.svc.RevokeSessions(r.Context(), req)
+	writeCommandResult(w, result, err)
+}
+
+func (s *Server) handleBanDevice(w http.ResponseWriter, r *http.Request) {
+	var req admin.BanDeviceRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := s.svc.BanDevice(r.Context(), req)
 	writeCommandResult(w, result, err)
 }
 

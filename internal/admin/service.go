@@ -54,6 +54,7 @@ const (
 	ActionSetChannelVerified       = "channel.set_verified"
 	ActionSetChannelFlags          = "channel.set_flags"
 	ActionRevokeSessions           = "account.revoke_sessions"
+	ActionBanDevice                = "account.ban_device"
 	ActionDeletePrivateMessages    = "messages.delete_private_messages"
 	ActionDeletePrivateHistory     = "messages.delete_private_history"
 	ActionCreateBot                = "bot.create"
@@ -227,6 +228,9 @@ type AuthService interface {
 	ListAuthorizations(ctx context.Context, userID int64) ([]domain.Authorization, error)
 	ResetAuthorization(ctx context.Context, userID, hash int64) (domain.Authorization, bool, error)
 	ResetAuthorizations(ctx context.Context, userID int64, keepAuthKeyID [8]byte) ([]domain.Authorization, error)
+	// BanUserDevices bans every device fingerprint seen on userID's authorizations;
+	// see auth.Service.BanUserDevices.
+	BanUserDevices(ctx context.Context, userID int64, reason, actor string) (int, error)
 }
 
 type AuthKeyRevoker interface {
@@ -1333,6 +1337,12 @@ type RevokeSessionsRequest struct {
 	Hash      int64 `json:"hash,omitempty"`
 	KeepHash  int64 `json:"keep_hash,omitempty"`
 	RevokeAll bool  `json:"revoke_all,omitempty"`
+}
+
+type BanDeviceRequest struct {
+	CommandMeta
+	UserID int64  `json:"user_id"`
+	Reason string `json:"reason,omitempty"`
 }
 
 type DeletePrivateMessagesRequest struct {
@@ -3155,6 +3165,28 @@ func boolIntPatchDetails(p domain.ChannelAdminSettings) map[string]any {
 		details["slowmode_seconds"] = *p.SlowmodeSeconds
 	}
 	return details
+}
+
+// BanDevice bans every device fingerprint seen among userID's authorizations
+// (see auth.Service.BanUserDevices), so a fresh account signed up from the
+// same device afterwards is rejected at SignUp. It does not itself freeze or
+// otherwise touch the account userID -- combine with SetAccountFrozen if the
+// account itself should also be banned.
+func (s *Service) BanDevice(ctx context.Context, req BanDeviceRequest) (CommandResult, error) {
+	if req.UserID <= 0 {
+		return CommandResult{}, fmt.Errorf("user_id is required")
+	}
+	if s == nil || s.auth == nil {
+		return CommandResult{}, fmt.Errorf("admin auth dependency is not configured")
+	}
+	return s.runCommand(ctx, req.CommandMeta, ActionBanDevice, req.UserID, domain.Peer{}, req, func() (CommandResult, error) {
+		actor := req.CommandMeta.Actor
+		count, err := s.auth.BanUserDevices(ctx, req.UserID, req.Reason, actor)
+		if err != nil {
+			return CommandResult{}, err
+		}
+		return CommandResult{Details: map[string]any{"devices_banned": count}}, nil
+	})
 }
 
 func (s *Service) RevokeSessions(ctx context.Context, req RevokeSessionsRequest) (CommandResult, error) {
