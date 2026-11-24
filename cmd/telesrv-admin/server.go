@@ -1925,7 +1925,6 @@ func (s *server) handleBanDeviceAPI(w http.ResponseWriter, r *http.Request) {
 	req := admin.BanDeviceRequest{
 		CommandMeta: s.commandMetaFromAPI(r, body.CommandID, body.Reason, body.Confirm, "ban-device"),
 		UserID:      body.UserID.Int64(),
-		Reason:      body.Reason,
 	}
 	result, err := s.callAdminAPI(r.Context(), "/v1/accounts/ban-device", req)
 	writeCommandResultAPI(w, result, err)

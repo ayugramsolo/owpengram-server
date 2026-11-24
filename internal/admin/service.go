@@ -1341,8 +1341,7 @@ type RevokeSessionsRequest struct {
 
 type BanDeviceRequest struct {
 	CommandMeta
-	UserID int64  `json:"user_id"`
-	Reason string `json:"reason,omitempty"`
+	UserID int64 `json:"user_id"`
 }
 
 type DeletePrivateMessagesRequest struct {
@@ -3180,8 +3179,7 @@ func (s *Service) BanDevice(ctx context.Context, req BanDeviceRequest) (CommandR
 		return CommandResult{}, fmt.Errorf("admin auth dependency is not configured")
 	}
 	return s.runCommand(ctx, req.CommandMeta, ActionBanDevice, req.UserID, domain.Peer{}, req, func() (CommandResult, error) {
-		actor := req.CommandMeta.Actor
-		count, err := s.auth.BanUserDevices(ctx, req.UserID, req.Reason, actor)
+		count, err := s.auth.BanUserDevices(ctx, req.UserID, req.CommandMeta.Reason, req.CommandMeta.Actor)
 		if err != nil {
 			return CommandResult{}, err
 		}
